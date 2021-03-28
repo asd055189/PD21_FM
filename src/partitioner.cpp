@@ -62,7 +62,46 @@ void Partitioner::parseInput(fstream& inFile)
     }
     return;
 }
-
+void Partitioner::printblist(){
+for (int i=-_cellNum;i<=_cellNum;i++){
+            
+            Node *aa=_bList[0][i],*bb=_bList[1][i];
+            if (aa!=NULL)
+                cout << "\ngain : "<<i<<" in A\n";
+            while(aa!=NULL){
+                
+                if (aa->getPrev()!=NULL)
+                    cout <<"|"<<_cellArray[aa->getPrev()->getId()]->getName();
+                else 
+                    cout <<"|NULL";
+                cout<<"<-"; 
+                cout <<_cellArray[aa->getId()]->getName();
+                cout<<"->"; 
+                if (aa->getNext()!=NULL)
+                    cout <<_cellArray[aa->getNext()->getId()]->getName()<<"|\n";
+                else 
+                    cout <<"NULL|\n";
+                aa=aa->getNext();
+            }
+            if(bb!=NULL)
+            cout << "\ngain : "<<i<<" in B\n";
+            while(bb!=NULL){
+                if (bb->getPrev()!=NULL)
+                    cout  <<"|"<<_cellArray[bb->getPrev()->getId()]->getName();
+                else 
+                    cout <<"|NULL";
+                cout<<"<-"; 
+                cout <<_cellArray[bb->getId()]->getName();
+                cout<<"->"; 
+                if (bb->getNext()!=NULL)
+                    cout <<_cellArray[bb->getNext()->getId()]->getName()<<"|\n";
+                else 
+                    cout <<"NULL|\n";
+                
+                bb=bb->getNext();
+            }
+    }
+}
 void Partitioner::partition()
 {
     //_cutSize
@@ -105,7 +144,7 @@ void Partitioner::partition()
     for (int i=0;i<_cellNum;i++)
         if(_cellArray[i]->getPinNum()>_maxPinNum)
             _maxPinNum=_cellArray[i]->getPinNum();
-    int max_gain_value=-_maxPinNum;
+    int max_gain_value=_maxPinNum;
     for (int i=-_maxPinNum;i<=_maxPinNum;i++){
         _bList[0].insert(pair<int, Node*>(i,NULL));
         _bList[1].insert(pair<int, Node*>(i,NULL));
@@ -161,30 +200,98 @@ void Partitioner::partition()
             _cutSize++;
     cout <<"\ncutsize : "<<_cutSize<<endl;
     /*****************init cutsize*****************/
-    /*****************start*****************/
+    /*****************process start*****************/
 
-    int diffa,diffb;
     //select a node with max gain and more balance
-    if(_bList[0][max_gain_value]!=NULL)
-        _maxGainCell=_bList[0][max_gain_value];
-    else
-        _maxGainCell=_bList[1][max_gain_value];
     
-    
-    /*****************start*****************/
+    bool flag=true;
+    cout <<"======step start======"<<endl;
+    while(flag){
+        //printblist(); 
+        _maxGainCell=NULL;
+
+        //get max gainpointer
+        while(true){
+            if(_bList[0][max_gain_value]!=NULL)
+                _maxGainCell=_bList[0][max_gain_value];
+            while(_maxGainCell!=NULL){ 
+                if (L_bound < _partSize[_cellArray[_maxGainCell->getId()]->getPart()] && _partSize[_cellArray[_maxGainCell->getId()]->getPart()] < U_bound)
+                    break;
+                
+                _maxGainCell=_maxGainCell->getNext();
+            }
+
+            if(_maxGainCell==NULL)
+                _maxGainCell=_bList[1][max_gain_value];
+            while(_maxGainCell!=NULL){
+                if (L_bound < _partSize[_cellArray[_maxGainCell->getId()]->getPart()] && _partSize[_cellArray[_maxGainCell->getId()]->getPart()] < U_bound)
+                    break;
+                
+                _maxGainCell=_maxGainCell->getNext();
+            }
+            if(_maxGainCell!=NULL || max_gain_value< -_maxPinNum)
+                break;
+            max_gain_value--;
+        }
+
+        //if gainpointer not fount(means that is the end of the iteration)
+        if(_maxGainCell==NULL){
+             cout <<"======iteration end======\n\n";
+             cout <<"move his : ";
+             for (int i=0;i<_moveStack.size();i++)
+                cout << _cellArray[_moveStack[i]]->getName()<<" ";
+            cout <<endl<<"_moveNum : "<<_moveNum<<endl;
+            cout <<"_bestMoveNum : "<<_bestMoveNum<<endl;
+            cout <<"bestMove : ";
+            for (int i=0;i<=_bestMoveNum;i++)
+                cout << _cellArray[_moveStack[i]]->getName()<<" ";
+            break;
+        }
+
+        //remove node from bucket
+        if (_maxGainCell->getPrev()!=NULL)
+            _maxGainCell->getPrev()->setNext(_maxGainCell->getNext());
+        else
+            _bList[_cellArray[_maxGainCell->getId()]->getPart()][_cellArray[_maxGainCell->getId()]->getGain()]=_maxGainCell->getNext();
+            
+        if (_maxGainCell->getNext()!=NULL)
+            _maxGainCell->getNext()->setPrev(_maxGainCell->getPrev());
+        
+        //lock the switched node
+        _cellArray[_maxGainCell->getId()]->lock();
+
+        cout <<"\nselect node : "<<_cellArray[_maxGainCell->getId()]->getName()<<endl
+             <<"gain : "<<_cellArray[_maxGainCell->getId()]->getGain()<<endl;
+
+        update_gain(_cellArray[_maxGainCell->getId()],max_gain_value);
+
+        
+        
+        _accGain+=_cellArray[_maxGainCell->getId()]->getGain();
+        cout <<"_accGain : "<<_accGain<<endl;
+        if (_accGain>_maxAccGain){
+            _maxAccGain=_accGain;
+            _bestMoveNum=_moveNum;
+        }
+
+        //cout << _maxGainCell->getId()<<endl;
+        _moveNum++;
+        _moveStack.push_back(_maxGainCell->getId());
+    }
+    /*****************process end*****************/
     //reportNet() ;
     //reportCell(); 
 }
 void Partitioner::update_gain(Cell* target,int &max_gain_value){
     bool part=target->getPart();
     vector <int> ori_gain;
-    max_gain_value=-_maxPinNum;
+    max_gain_value=_maxPinNum;
     for (int i=0;i<_cellNum;i++)
         ori_gain.push_back(_cellArray[i]->getGain());
     for (int i=0;i<target->getNetList().size();i++){
         if(_netArray[target->getNetList()[i]]->getPartCount(part)==1){
             for(int j=0;j<_netArray[target->getNetList()[i]]->getCellList().size();j++){
-                if(_cellArray[_netArray[target->getNetList()[i]]->getCellList()[j]]->getPart()==!part){
+                if(_cellArray[_netArray[target->getNetList()[i]]->getCellList()[j]]->getPart()==!part && _cellArray[_netArray[target->getNetList()[i]]->getCellList()[j]]->getName()!=target->getName()){
                     _cellArray[_netArray[target->getNetList()[i]]->getCellList()[j]]->decGain();
                 }
             }
@@ -211,22 +318,26 @@ void Partitioner::update_gain(Cell* target,int &max_gain_value){
     for (int i=0;i<_cellNum; i++){
         if(_cellArray[i]->getGain()>max_gain_value)
             max_gain_value=_cellArray[i]->getGain();
-        if(ori_gain[i]!=_cellArray[i]->getGain()){
+        if(ori_gain[i]!=_cellArray[i]->getGain() && !_cellArray[i]->getLock() ){
+            
             if(_cellArray[i]->getNode()->getNext()!=NULL)
                 _cellArray[i]->getNode()->getNext()->setPrev(_cellArray[i]->getNode()->getPrev());
             if(_cellArray[i]->getNode()->getPrev()!=NULL)
                 _cellArray[i]->getNode()->getPrev()->setNext(_cellArray[i]->getNode()->getNext());
-            else
+            if(_cellArray[i]->getNode()->getPrev()==NULL){
                 _bList[_cellArray[i]->getPart()][ori_gain[i]]=_cellArray[i]->getNode()->getNext();
+            }
             if(_bList[_cellArray[i]->getPart()][_cellArray[i]->getGain()]!=NULL){
                 _bList[_cellArray[i]->getPart()][_cellArray[i]->getGain()]->setPrev(_cellArray[i]->getNode());
                 _cellArray[i]->getNode()->setNext(_bList[_cellArray[i]->getPart()][_cellArray[i]->getGain()]);
             }
             _bList[_cellArray[i]->getPart()][_cellArray[i]->getGain()]=_cellArray[i]->getNode();
+            _bList[_cellArray[i]->getPart()][_cellArray[i]->getGain()]->setPrev(NULL);
         }
 
 
     }
+   //printblist();
 }
 void Partitioner::printSummary() const
 {

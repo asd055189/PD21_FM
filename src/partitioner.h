@@ -47,7 +47,7 @@ public:
     void reportNet() const;
     void reportCell() const;
     void writeResult(fstream& outFile);
-
+    void printblist();
 private:
     int                 _cutSize;       // cut size
     int                 _partSize[2];   // size (cell number) of partition A(0) and B(1)
