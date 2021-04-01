@@ -34,6 +34,7 @@ public:
    
     //add
     void update_gain(Cell* target,int &max_gain_value);
+    void init_gain(int & max_gain_value);
     //add
 
 

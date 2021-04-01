@@ -21,8 +21,8 @@ public:
 
     // Set functions
     void setId(const int& id) { _id = id; }
-    void setPrev(Node* prev)  { _prev = prev; }
-    void setNext(Node* next)  { _next = next; }
+    void setPrev(Node* prev)  { if(this!=NULL)_prev = prev; }
+    void setNext(Node* next)  { if (this != NULL)_next = next; }
 
 private:
     int         _id;    // id of the node (indicating the cell)
